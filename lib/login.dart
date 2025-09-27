@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_application_1/register.dart';
+import 'package:flutter/material.dart';
+import 'register.dart';
 import 'auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_page.dart'; // crea una pagina di home protetta
+import 'home_scaffold.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,7 +21,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      _showDialog("Errore", "Email e password sono obbligatorie");
+      _showErrorDialog("Email e password sono obbligatorie");
       return;
     }
 
@@ -29,30 +29,28 @@ class _LoginPageState extends State<LoginPage> {
       final authService = AuthService();
       final token = await authService.login(email, password);
 
-      // Salva il token in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt', token);
 
-      // Naviga verso la home page
       Navigator.pushReplacement(
         context,
-        CupertinoPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const HomeScaffold()),
       );
     } catch (e) {
-      _showDialog("Errore", e.toString());
+      _showErrorDialog(e.toString().replaceFirst("Exception: ", ""));
     }
   }
 
-  void _showDialog(String title, String content) {
-    showCupertinoDialog(
+  void _showErrorDialog(String content) {
+    showDialog(
       context: context,
-      builder: (_) => CupertinoAlertDialog(
-        title: Text(title),
+      builder: (_) => AlertDialog(
+        title: const Text("Errore di accesso"),
         content: Text(content),
         actions: [
-          CupertinoDialogAction(
+          TextButton(
             child: const Text("OK"),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -61,60 +59,77 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Image.asset("images/calcettiamo_logo.png", height: 40),
+    return Scaffold(
+      appBar: AppBar(
+        title: Image.asset("images/calcettiamo_logo.png", height: 40),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                "Benvenuto!",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              SizedBox(height: MediaQuery.of(context).size.height * 0.1),
+              Text(
+                "Bentornato su Calcettiamo!",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Accedi per continuare",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
               ),
               const SizedBox(height: 40),
-              CupertinoTextField(
+              TextField(
                 controller: _emailController,
-                placeholder: "Email",
-                keyboardType: TextInputType.emailAddress,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey6,
-                  borderRadius: BorderRadius.circular(12),
+                decoration: InputDecoration(
+                  labelText: "Email",
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
-              CupertinoTextField(
+              TextField(
                 controller: _passwordController,
-                placeholder: "Password",
-                obscureText: true,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey6,
-                  borderRadius: BorderRadius.circular(12),
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                obscureText: true,
               ),
               const SizedBox(height: 30),
-              CupertinoButton.filled(
-                borderRadius: BorderRadius.circular(12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: appGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: _login,
-                color: appGreen,
-                child: const Text("Accedi"),
+                child: const Text("Accedi", style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
               const SizedBox(height: 20),
-              CupertinoButton(
+              TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
-                    CupertinoPageRoute(
-                      builder: (_) => const RegistrationPage(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const RegistrationPage()),
                   );
                 },
-                child: Text(
+                child: const Text(
                   "Non hai un account? Registrati",
                   style: TextStyle(color: appGreen),
                 ),

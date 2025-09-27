@@ -1,14 +1,13 @@
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/profile_edit.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login.dart';
+import 'profile_edit.dart';
 
 class ProfilePage extends StatefulWidget {
-  final String token; // Passiamo il JWT dal login
-
-  const ProfilePage({super.key, required this.token});
+  const ProfilePage({super.key});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -16,27 +15,38 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   File? _profileImage;
-  final List<String> _friends = ["Mario Rossi", "Luca Bianchi", "Anna Verdi"];
+  String? _email;
+  String? _role;
+  bool _isLoading = true;
 
   static const Color appGreen = Color(0xFF289775);
-
-  late String email;
-  late String role;
 
   @override
   void initState() {
     super.initState();
-    final decodedToken = JwtDecoder.decode(widget.token);
-    email = decodedToken["sub"]; // dal tuo JWT il subject è l'email
-    role = decodedToken["roles"][0]; // prendi il primo ruolo
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+
+    if (token != null) {
+      final decodedToken = JwtDecoder.decode(token);
+      setState(() {
+        _email = decodedToken["sub"];
+        _role = decodedToken["roles"][0];
+        _isLoading = false;
+      });
+    } else {
+      // Se non c'è token, l'utente non dovrebbe essere qui.
+      _logout();
+    }
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-    );
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
 
     if (pickedFile != null) {
       setState(() {
@@ -45,171 +55,122 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  void _addFriend() {
-    showCupertinoDialog(
-      context: context,
-      builder: (_) {
-        final TextEditingController controller = TextEditingController();
-        return CupertinoAlertDialog(
-          title: const Text("Aggiungi Amico"),
-          content: CupertinoTextField(
-            controller: controller,
-            placeholder: "Nome amico",
-          ),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text("Annulla"),
-              onPressed: () => Navigator.pop(context),
-            ),
-            CupertinoDialogAction(
-              child: const Text("Aggiungi"),
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() {
-                    _friends.add(controller.text);
-                  });
-                }
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt');
 
-  void _logout() {
-    Navigator.pop(context); // Torna alla login
+    // Naviga alla LoginPage e rimuovi tutte le rotte precedenti
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (Route<dynamic> route) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text("Profilo")),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // FOTO PROFILO
-              GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: CupertinoColors.systemGrey4,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : null,
-                  child: _profileImage == null
-                      ? const Icon(
-                          CupertinoIcons.person_alt_circle,
-                          size: 80,
-                          color: CupertinoColors.white,
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 12),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _pickImage,
-                child: const Text(
-                  "Cambia immagine",
-                  style: TextStyle(color: appGreen),
-                ),
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Text("Vai al Profilo"),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    CupertinoPageRoute(builder: (_) => ProfileEditPage()),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 24),
-
-              // DATI UTENTE DAL JWT
-              Text(
-                email,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                "Ruolo: $role",
-                style: const TextStyle(color: CupertinoColors.systemGrey),
-              ),
-
-              const SizedBox(height: 30),
-
-              // LISTA AMICI
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Profilo Utente"),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Logout',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Amici",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _addFriend,
-                    child: const Icon(
-                      CupertinoIcons.add_circled,
-                      color: appGreen,
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey.shade300,
+                      backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                      child: _profileImage == null
+                          ? Icon(Icons.person, size: 60, color: Colors.grey.shade700)
+                          : null,
                     ),
+                  ),
+                  TextButton(
+                    onPressed: _pickImage,
+                    child: const Text("Cambia immagine", style: TextStyle(color: appGreen)),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          _buildProfileInfo(Icons.email, "Email", _email ?? 'N/D'),
+                          const Divider(),
+                          _buildProfileInfo(Icons.security, "Ruolo", _role ?? 'N/D'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildProfileOption(
+                    context,
+                    icon: Icons.edit,
+                    title: "Modifica Profilo",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ProfileEditPage()),
+                      );
+                    },
+                  ),
+                   _buildProfileOption(
+                    context,
+                    icon: Icons.info_outline,
+                    title: "Informazioni",
+                    onTap: () {
+                      // Logica per mostrare informazioni sull'app
+                    },
                   ),
                 ],
               ),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _friends.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_friends[index]),
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          child: const Icon(
-                            CupertinoIcons.delete,
-                            color: CupertinoColors.systemRed,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _friends.removeAt(index);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            ),
+    );
+  }
 
-              const SizedBox(height: 40),
-
-              // LOGOUT
-              CupertinoButton.filled(
-                borderRadius: BorderRadius.circular(12),
-                onPressed: _logout,
-                color: CupertinoColors.destructiveRed,
-                child: const Text("Logout"),
-              ),
+  Widget _buildProfileInfo(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: appGreen),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 4),
+              Text(value, style: Theme.of(context).textTheme.titleMedium),
             ],
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileOption(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap}) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: ListTile(
+        leading: Icon(icon, color: appGreen),
+        title: Text(title),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
       ),
     );
   }
