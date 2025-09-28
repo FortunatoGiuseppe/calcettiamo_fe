@@ -54,7 +54,7 @@ class _BookingPageState extends State<BookingPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    CupertinoPageRoute(builder: (_) => FieldsSearchPage()),
+                    CupertinoPageRoute(builder: (_) => FieldSearchPage()),
                   );
                 },
               ),
